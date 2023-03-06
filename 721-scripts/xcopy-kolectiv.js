@@ -107,16 +107,14 @@ function appendToList(contractCall) {
         }
     })
     pageIndex = contractCall.pageKey;
-    console.log("setting key", contractCall);
+    // console.log("setting key", contractCall);
 }
 
 console.log("fetching NFTs for contract address:", contractAddress);
 console.log("...");
 
 // Print total NFT count returned in the response:
-const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress, {
-    pageKey: "0x000000000000000000000000000000002bf93d033de34e6daf8cb4ea09e96478"
-});
+const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
 
 // console.log(nftsForContract);
 appendToList(nftsForContract);
@@ -128,13 +126,13 @@ while (pageIndex != undefined) {
     appendToList(newContractCall);
 }
 
-
-console.log("beast ids", beast.length);
-console.log("pump ids", pump.length);
-console.log("rip ids", rip.length);
-console.log(pageIndex);
-console.log(testCount);
-
 console.log("beast ids", beast);
 console.log("pump ids", pump);
 console.log("rip ids", rip);
+
+console.log("beast count", beast.length);
+console.log("pump count", pump.length);
+console.log("rip count", rip.length);
+console.log(pageIndex);
+console.log(testCount);
+
