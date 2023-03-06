@@ -19,6 +19,7 @@
   "homepage": "https://github.com/wlhunter00/Editions-Scraping#readme",
   "type": "module",
   "dependencies": {
+    "@notionhq/client": "^2.2.3",
     "alchemy-sdk": "^2.5.0",
     "dotenv": "^16.0.3"
   }
