@@ -13,9 +13,16 @@ const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
 const contractAddress = "0x0825F050E9B021A0E9de8CB1fb10b6C9F41e834C";
+
 console.log("fetching NFTs for contract address:", contractAddress);
 console.log("...");
 
 // Print total NFT count returned in the response:
 const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
-console.log(nftsForContract);
+// console.log(nftsForContract);
+
+nftsForContract.nfts.forEach(nft => {
+    console.log(nft.title);
+    console.log(nft.tokenId);
+    console.log(nft.tokenType.slice(3));
+});
