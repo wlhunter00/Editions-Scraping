@@ -16,8 +16,61 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x0825F050E9B021A0E9de8CB1fb10b6C9F41e834C";
+const contractAddress = "0x8A939fd297FAb7388d6e6C634eEe3C863626bE57";
 const artistNotionID = "61723c60e9274ce1b942657596dd024b";
+
+let pageIndex = "";
+let testCount = 0;
+let artIndex = {};
+let artStorage = {}
+
+function appendToList(contractCall) {
+    contractCall.nfts.forEach(nft => {
+        testCount++;
+        const nftTitle = nft.title.split(" #");
+        if (Array.isArray(artIndex[nftTitle[0]])) {
+            artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
+        }
+        else {
+            artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
+            artStorage[nftTitle[0]] = [nft];
+        }
+    })
+    pageIndex = contractCall.pageKey;
+    // console.log("setting key", contractCall);
+}
+
+function returnLastElement(arr, j, n) {
+    arr.sort(function (a, b) { return a - b });
+
+    for (let i = j; i < n; i++)
+        if (arr[i] - arr[i - 1] != 1)
+            return i - 1;
+
+    return n - 1;
+}
+
+function detectRange(artName) {
+    let idArray = artIndex[artName];
+    let megaString = "";
+    let endPoint = -1;
+    idArray.sort(function (a, b) { return a - b });
+
+    while (endPoint != idArray.length - 1) {
+        const newBegin = endPoint + 2;
+        // console.log(newBegin);
+        endPoint = returnLastElement(idArray, newBegin, idArray.length);
+        if (idArray[endPoint] === idArray[newBegin - 1]) {
+            megaString = `${megaString}, ${idArray[endPoint]}`;
+        }
+        else {
+            megaString = `${megaString}, ${idArray[newBegin - 1]}-${idArray[endPoint]}`;
+        }
+    }
+    megaString = megaString.slice(2);
+    return megaString
+    // console.log(megaString)
+}
 
 // Function to add into notion db
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
@@ -92,6 +145,19 @@ console.log("...");
 // Print total NFT count returned in the response:
 const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
 
-nftsForContract.nfts.forEach(nft => {
-    addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId);
+appendToList(nftsForContract);
+while (pageIndex != undefined) {
+    console.log("making api call", pageIndex);
+    const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
+        pageKey: pageIndex
+    });
+    appendToList(newContractCall);
+}
+
+console.log(testCount);
+
+const artList = Object.keys(artStorage);
+artList.forEach(artname => {
+    const newIDs = detectRange(artname);
+    addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
 });
