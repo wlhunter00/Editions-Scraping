@@ -16,8 +16,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x0825F050E9B021A0E9de8CB1fb10b6C9F41e834C";
-const artistNotionID = "5819c5ee0c914b928552298df9dc1a38";
+const contractAddress = "0xB27C9Aa6d9281A4B71B1A8d0B8DE026510dc878C";
+const artistNotionID = "84f4aa57d05b40d0a048b17c8cb3fa2a";
 
 // Function to add into notion db
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
@@ -76,9 +76,9 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                 },
             },
         })
-        console.log(response)
-        console.log("Success! Entry added.")
+        console.log("Success! Entry added.", title)
     } catch (error) {
+        console.log(title);
         console.error(error.body)
     }
 }

@@ -16,11 +16,12 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x814954baf41f99c0b8de7ec0d7fa0956e298fa67";
+const contractAddress = "0x4D232CD85294Acd53Ec03F4A57F57888c9Ea1946";
 const artistNotionID = "84f4aa57d05b40d0a048b17c8cb3fa2a";
 
 let pageIndex = "";
 let testCount = 0;
+let apiCalls = 0;
 let artIndex = {};
 let artStorage = {}
 
@@ -28,12 +29,18 @@ function appendToList(contractCall) {
     contractCall.nfts.forEach(nft => {
         testCount++;
         const nftTitle = nft.title.split(" #");
-        if (Array.isArray(artIndex[nftTitle[0]])) {
-            artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
-        }
-        else {
-            artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
-            artStorage[nftTitle[0]] = [nft];
+        if (nft.rawMetadata.attributes && nft.rawMetadata.attributes[0]) {
+            // console.log(nft.rawMetadata.attributes[0].value)
+            if (nft.rawMetadata.attributes[0].value.includes("Raf")) {
+                console.log(nftTitle)
+                if (Array.isArray(artIndex[nftTitle[0]])) {
+                    artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
+                }
+                else {
+                    artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
+                    artStorage[nftTitle[0]] = [nft];
+                }
+            }
         }
     })
     pageIndex = contractCall.pageKey;
@@ -147,7 +154,8 @@ const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
 
 appendToList(nftsForContract);
 while (pageIndex != undefined) {
-    console.log("making api call", pageIndex);
+    apiCalls++;
+    console.log("making api call", pageIndex, apiCalls);
     const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
         pageKey: pageIndex
     });
@@ -159,5 +167,7 @@ console.log(testCount);
 const artList = Object.keys(artStorage);
 artList.forEach(artname => {
     const newIDs = detectRange(artname);
-    addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
+    setTimeout(() => {
+        addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
+    }, 5000);
 });
