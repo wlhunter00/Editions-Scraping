@@ -16,7 +16,7 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x8A939fd297FAb7388d6e6C634eEe3C863626bE57";
+const contractAddress = "0x3696Cd00618a08C8793208385aE526677C889D4A";
 const artistNotionID = "61723c60e9274ce1b942657596dd024b";
 
 let pageIndex = "";
