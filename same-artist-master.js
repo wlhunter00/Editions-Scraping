@@ -21,10 +21,12 @@ const alchemy = new Alchemy(settings);
 const artistName = "Alpha Centauri Kid"
 const contractAddressList = ["0x9f803635a5af311d9a3b73132482a95eb540f71a", "0xd33bc0af2dc4e39cbaef4beff8d1fb3c00c2e7a3"];
 
+// Setup inital variables for tracking
 let contractStorage = {};
 let errorTokens = [];
 let countContracts = 0;
 
+// Takes in a contract call for a 721 contract, and will identify editions
 function appendToList(contractCall, contractAddress) {
     contractCall.nfts.forEach(nft => {
         const nftTitle = nft.title.split(" #");
@@ -34,6 +36,7 @@ function appendToList(contractCall, contractAddress) {
         else {
             contractStorage[contractAddress].artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
             contractStorage[contractAddress].artStorage[nftTitle[0]] = [nft];
+            // If there is another # in the title of the NFT (other than identifying the edition number) - we need to throw an error
             if (nftTitle.length == 3) {
                 console.log("# found in NFT title!", nft.title)
                 errorTokens.push({
@@ -46,9 +49,9 @@ function appendToList(contractCall, contractAddress) {
         contractStorage[contractAddress].testCount++;
     });
     contractStorage[contractAddress].pageIndex = contractCall.pageKey;
-    // console.log("setting key", contractCall);
 }
 
+// Helper function for detectRange
 function returnLastElement(arr, j, n) {
     arr.sort(function (a, b) { return a - b });
 
@@ -59,6 +62,7 @@ function returnLastElement(arr, j, n) {
     return n - 1;
 }
 
+// Takes in an array of ints, and detects ranges where the numbers are continous. Needed for 721s.
 function detectRange(artName, contractAddress) {
     let idArray = contractStorage[contractAddress].artIndex[artName];
     let megaString = "";
@@ -67,7 +71,6 @@ function detectRange(artName, contractAddress) {
 
     while (endPoint != idArray.length - 1) {
         const newBegin = endPoint + 2;
-        // console.log(newBegin);
         endPoint = returnLastElement(idArray, newBegin, idArray.length);
         if (idArray[endPoint] === idArray[newBegin - 1]) {
             megaString = `${megaString}, ${idArray[endPoint]}`;
@@ -78,10 +81,10 @@ function detectRange(artName, contractAddress) {
     }
     megaString = megaString.slice(2);
     return megaString
-    // console.log(megaString)
 }
 
 // Function to add art into notion db
+// Eventually we will want to upload directly to the database and cut out notion
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
     try {
         const response = await notion.pages.create({
@@ -142,6 +145,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
     } catch (error) {
         console.log("Error found when adding", title, "to Notion!");
         console.error(error.body);
+        // Pushes error object if there is an issue 
         errorTokens.push({
             title: title,
             contractAddress: address,
@@ -150,7 +154,9 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
     }
 }
 
+// Core function. Takes in the artist and the contract address
 async function handleScraping(artistNotionID, contractAddress) {
+    // contract storage stores key variables for each contract
     contractStorage[contractAddress] = {
         pageIndex: "",
         testCount: 0,
@@ -161,10 +167,11 @@ async function handleScraping(artistNotionID, contractAddress) {
     console.log("fetching NFTs for contract address:", contractAddress);
     console.log("...");
 
-    // Query first NFT page
+    // Query first NFT page from alchemy
     const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
 
     if (nftsForContract.nfts[0].tokenType.includes("721")) {
+        // handle the first page of NFTs
         appendToList(nftsForContract, contractAddress);
         while (contractStorage[contractAddress].pageIndex != undefined) {
             console.log("making api call", contractStorage[contractAddress].pageIndex);
@@ -176,8 +183,10 @@ async function handleScraping(artistNotionID, contractAddress) {
         }
         console.log("# ID's parsed from", contractAddress, "-", contractStorage[contractAddress].testCount);
 
+        // After all the Alchemy pages have been scraped, loop through each edition
         const artList = Object.keys(contractStorage[contractAddress].artStorage);
         artList.forEach(artname => {
+            // Take the array of ints for IDs and instead get a string with ranges
             const newIDs = detectRange(artname, contractAddress);
             console.log(`${artname}: ${newIDs}`);
             addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
@@ -185,25 +194,24 @@ async function handleScraping(artistNotionID, contractAddress) {
         console.log("...");
     }
     else if (nftsForContract.nfts[0].tokenType.includes("1155")) {
+        // For 1155s all we need to do is store the edition
         nftsForContract.nfts.forEach(nft => {
             addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId);
         });
-
         contractStorage[contractAddress].pageIndex = nftsForContract.pageKey;
+        // Loop through all pages
         while (contractStorage[contractAddress].pageIndex != undefined) {
             console.log("making api call", contractStorage[contractAddress].pageIndex);
             console.log("...");
+
             const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
                 pageKey: contractStorage[contractAddress].pageIndex
             });
-
             newContractCall.nfts.forEach(nft => {
                 addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId);
             });
-
             contractStorage[contractAddress].pageIndex = newContractCall.pageKey;
         }
-
         console.log("...");
     }
     else {
@@ -213,6 +221,7 @@ async function handleScraping(artistNotionID, contractAddress) {
 }
 
 async function main() {
+    // Query the artists notion id from the database
     const artistIDQuery = await notion.databases.query({
         database_id: "8c53db8170764a0480cf9bcab3b5233e",
         filter: {
@@ -228,11 +237,13 @@ async function main() {
         }
     });
 
+    // Only scrape if the artist exists
     if (artistIDQuery.results[0]) {
         const artistNotionID = artistIDQuery.results[0].id;
         console.log(`Scraping NFTs for ${artistName} (${artistNotionID}). ${contractAddressList.length} contract addresses have been provided.`);
         console.log("...");
 
+        // Run the scrape for each contract in array
         contractAddressList.forEach(async contractAddress => {
             await handleScraping(artistNotionID, contractAddress);
             if (countContracts == contractAddressList.length && errorTokens.length > 0) {
