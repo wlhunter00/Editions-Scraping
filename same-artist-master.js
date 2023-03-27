@@ -18,8 +18,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "Alpha Centauri Kid"
-const contractAddressList = ["0x9f803635a5af311d9a3b73132482a95eb540f71a", "0xd33bc0af2dc4e39cbaef4beff8d1fb3c00c2e7a3"];
+const artistName = "Pop Wonder"
+const contractAddressList = ["0x05BdA5B5cb50DcC02Af5e346B4c3Fcdb68bb8F52"];
 
 // Setup inital variables for tracking
 let contractStorage = {};
@@ -124,7 +124,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                         },
                     ]
                 },
-                'Collection Category': {
+                'Artwork Category': {
                     'select': {
                         'name': "Edition"
                     }

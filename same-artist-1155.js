@@ -59,7 +59,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                         },
                     ]
                 },
-                'Collection Category': {
+                'Artwork Category': {
                     'select': {
                         'name': "Edition"
                     }
