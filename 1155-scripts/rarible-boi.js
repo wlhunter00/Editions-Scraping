@@ -16,7 +16,7 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0xB66a603f4cFe17e3D27B87a8BfCaD319856518B8";
+const contractAddress = "0xd07dc4262BCDbf85190C01c996b4C06a461d2430";
 const artistNotionID = "82a2413a79634462bf293c132f51f31b";
 
 let pageIndex = "";
@@ -26,17 +26,11 @@ let artStorage = {}
 
 function appendToList(contractCall) {
     contractCall.nfts.forEach(nft => {
+        // console.log(nft);
         if (nft.title.includes("#boi")) {
             console.log(nft.title);
             testCount++;
-            const nftTitle = nft.title.split(" #");
-            if (Array.isArray(artIndex[nftTitle[0]])) {
-                artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
-            }
-            else {
-                artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
-                artStorage[nftTitle[0]] = [nft];
-            }
+            addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, nft.contract.address, nft.tokenId);
         }
     })
     pageIndex = contractCall.pageKey;
@@ -75,9 +69,10 @@ function detectRange(artName) {
     // console.log(megaString)
 }
 
-// Function to add into notion db
+// Function to add art into notion db
+// Eventually we will want to upload directly to the database and cut out notion
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
-    console.log(tokenIDs)
+    console.log(title, tokenType, collection, artistID, address, tokenIDs);
     try {
         const response = await notion.pages.create({
             parent: { database_id: databaseId },
@@ -135,8 +130,14 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
         })
         console.log("Success! Entry added.", title)
     } catch (error) {
-        console.log(title);
-        console.error(error.body)
+        console.log("Error found when adding", title, "to Notion!");
+        console.error(error.body);
+        // Pushes error object if there is an issue 
+        errorTokens.push({
+            title: title,
+            contractAddress: address,
+            tokenId: tokenIDs
+        });
     }
 }
 
@@ -160,10 +161,8 @@ while (pageIndex != undefined) {
 
 console.log(testCount);
 
-const artList = Object.keys(artStorage);
-artList.forEach(artname => {
-    // const newIDs = detectRange(artname);
-    console.log("storage", artStorage[artname][0]);
-    console.log(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, artStorage[artname][0].tokenId);
-    addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, artStorage[artname][0].tokenId);
-});
+// const artList = Object.keys(artStorage);
+// artList.forEach(artname => {
+//     console.log(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, artStorage[artname][0].contract.address, artStorage[artname][0].tokenId);
+//     addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, artStorage[artname][0].contract.address, artStorage[artname][0].tokenId);
+// });
