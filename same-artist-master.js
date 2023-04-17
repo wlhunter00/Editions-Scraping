@@ -18,8 +18,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "Pop Wonder"
-const contractAddressList = ["0x05BdA5B5cb50DcC02Af5e346B4c3Fcdb68bb8F52"];
+const artistName = "Coldie"
+const contractAddressList = ["0xe9662B4E55b5feEF13ca7067f319562142BD1681"];
 
 // Setup inital variables for tracking
 let contractStorage = {};
@@ -85,7 +85,7 @@ function detectRange(artName, contractAddress) {
 
 // Function to add art into notion db
 // Eventually we will want to upload directly to the database and cut out notion
-async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
+async function addItem(title, tokenType, collection, artistID, address, tokenIDs, artType) {
     try {
         const response = await notion.pages.create({
             parent: { database_id: databaseId },
@@ -126,7 +126,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                 },
                 'Artwork Category': {
                     'select': {
-                        'name': "Edition"
+                        'name': artType
                     }
                 },
                 'Token ID(s)': {
@@ -189,14 +189,16 @@ async function handleScraping(artistNotionID, contractAddress) {
             // Take the array of ints for IDs and instead get a string with ranges
             const newIDs = detectRange(artname, contractAddress);
             console.log(`${artname}: ${newIDs}`);
-            addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
+            const artType = newIDs.split(",").length - 1 > 0 ? "Edition" : "1of1"
+            addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
         });
         console.log("...");
     }
     else if (nftsForContract.nfts[0].tokenType.includes("1155")) {
         // For 1155s all we need to do is store the edition
         nftsForContract.nfts.forEach(nft => {
-            addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId);
+            console.log("adding", nft.title);
+            addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
         });
         contractStorage[contractAddress].pageIndex = nftsForContract.pageKey;
         // Loop through all pages
@@ -208,7 +210,8 @@ async function handleScraping(artistNotionID, contractAddress) {
                 pageKey: contractStorage[contractAddress].pageIndex
             });
             newContractCall.nfts.forEach(nft => {
-                addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId);
+                console.log("adding", nft.title);
+                addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
             });
             contractStorage[contractAddress].pageIndex = newContractCall.pageKey;
         }

@@ -16,8 +16,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x4D232CD85294Acd53Ec03F4A57F57888c9Ea1946";
-const artistNotionID = "82a2413a79634462bf293c132f51f31b";
+const contractAddress = "0xD78AFb925a21f87Fa0E35AbAE2aEad3F70Ced96B";
+const artistNotionID = "f9fb329edc56414bab44f617dc265ec2";
 
 let pageIndex = "";
 let testCount = 0;
@@ -31,7 +31,7 @@ function appendToList(contractCall) {
         const nftTitle = nft.title.split(" #");
         if (nft.rawMetadata.attributes && nft.rawMetadata.attributes[0]) {
             // console.log(nft.rawMetadata.attributes[0].value)
-            if (nft.rawMetadata.attributes[0].value.includes("Lirona")) {
+            if (nft.rawMetadata.attributes[0].value.includes("Coldie")) {
                 console.log(nftTitle)
                 if (Array.isArray(artIndex[nftTitle[0]])) {
                     artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
@@ -141,12 +141,6 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
     } catch (error) {
         console.log("Error found when adding", title, "to Notion!");
         console.error(error.body);
-        // Pushes error object if there is an issue 
-        errorTokens.push({
-            title: title,
-            contractAddress: address,
-            tokenId: tokenIDs
-        });
     }
 }
 
