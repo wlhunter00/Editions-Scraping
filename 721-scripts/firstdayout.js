@@ -3,6 +3,7 @@ import { Network, Alchemy } from "alchemy-sdk";
 import * as dotenv from 'dotenv';
 dotenv.config();
 import { Client } from "@notionhq/client"
+import * as fs from 'fs';
 
 const notion = new Client({ auth: process.env.NOTION_SECRET })
 const databaseId = process.env.DATABASE_ID
@@ -29,25 +30,18 @@ function appendToList(contractCall) {
     contractCall.nfts.forEach(nft => {
         testCount++;
         const nftTitle = nft.title.split(" #");
-        let artist = "";
         if (nft.rawMetadata.attributes) {
-            console.log(nft.rawMetadata.attributes)
-            nft.rawMetadata.attributes.forEach(attribute => {
-                if (attribute.trait_type === 'Artist') {
-                    // console.log(attribute.value);
-                    artist = attribute.value;
-                }
-            });
-            if (artist.includes("Drifter Shoots")) {
-                console.log(nftTitle)
-                if (Array.isArray(artIndex[nftTitle[0]])) {
-                    artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
-                }
-                else {
-                    artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
-                    artStorage[nftTitle[0]] = [nft];
-                }
+            const location = nft.rawMetadata.attributes[0].value;
+            // console.log(location);
+
+            if (Array.isArray(artIndex[location])) {
+                artIndex[location].push(parseInt(nft.tokenId))
             }
+            else {
+                artIndex[location] = [parseInt(nft.tokenId)];
+                artStorage[location] = [nft];
+            }
+
         }
     })
     pageIndex = contractCall.pageKey;
@@ -173,9 +167,15 @@ while (pageIndex != undefined) {
 console.log(testCount);
 
 const artList = Object.keys(artStorage);
+const final = []
 artList.forEach(artname => {
     const newIDs = detectRange(artname);
-    setTimeout(() => {
-        addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
-    }, 5000);
+    final.push({ artname: newIDs });
 });
+
+
+// Write data in 'Output.txt' .
+fs.writeFile('./outputs/firstdayout.txt', JSON.stringify(final), (err) => {
+    // In case of a error throw err.
+    if (err) throw err;
+})
