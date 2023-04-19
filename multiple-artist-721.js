@@ -16,8 +16,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // Print owner's wallet address:
-const contractAddress = "0x6913233adA65330aDF01F24F715DFFcc60497cc8";
-const artistNotionID = "3185b2559f114ab5aaa097d027899db8";
+const contractAddress = "0x503a3039e9ce236e9a12E4008AECBB1FD8B384A3";
+const artistNotionID = "cf51d9ef52594538b0b17050b2d18765";
 
 let pageIndex = "";
 let testCount = 0;
@@ -31,14 +31,14 @@ function appendToList(contractCall) {
         const nftTitle = nft.title.split(" #");
         let artist = "";
         if (nft.rawMetadata.attributes) {
-            console.log(nft.rawMetadata.attributes)
+            // console.log(nft.rawMetadata.attributes)
             nft.rawMetadata.attributes.forEach(attribute => {
                 if (attribute.trait_type === 'Artist') {
                     // console.log(attribute.value);
                     artist = attribute.value;
                 }
             });
-            if (artist.includes("Drifter Shoots")) {
+            if (artist.includes("Josie Bellini")) {
                 console.log(nftTitle)
                 if (Array.isArray(artIndex[nftTitle[0]])) {
                     artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
