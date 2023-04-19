@@ -18,8 +18,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "Coldie"
-const contractAddressList = ["0xe9662B4E55b5feEF13ca7067f319562142BD1681"];
+const artistName = "Josie Bellini"
+const contractAddressList = ["0xECf7EF42B57ee37A959BF507183C5dD6bf182081"];
 
 // Setup inital variables for tracking
 let contractStorage = {};
@@ -189,7 +189,7 @@ async function handleScraping(artistNotionID, contractAddress) {
             // Take the array of ints for IDs and instead get a string with ranges
             const newIDs = detectRange(artname, contractAddress);
             console.log(`${artname}: ${newIDs}`);
-            const artType = newIDs.split(",").length - 1 > 0 ? "Edition" : "1of1"
+            const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
             addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
         });
         console.log("...");
