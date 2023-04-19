@@ -88,7 +88,7 @@ function detectRange(artName) {
 
 // Function to add art into notion db
 // Eventually we will want to upload directly to the database and cut out notion
-async function addItem(title, tokenType, collection, artistID, address, tokenIDs) {
+async function addItem(title, tokenType, collection, artistID, address, tokenIDs, artType) {
     try {
         const response = await notion.pages.create({
             parent: { database_id: databaseId },
@@ -129,7 +129,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                 },
                 'Artwork Category': {
                     'select': {
-                        'name': "Edition"
+                        'name': artType
                     }
                 },
                 'Token ID(s)': {
@@ -175,7 +175,8 @@ console.log(testCount);
 const artList = Object.keys(artStorage);
 artList.forEach(artname => {
     const newIDs = detectRange(artname);
+    const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
     setTimeout(() => {
-        addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs);
+        addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
     }, 5000);
 });
