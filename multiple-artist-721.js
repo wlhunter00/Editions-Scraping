@@ -17,7 +17,7 @@ const alchemy = new Alchemy(settings);
 
 // inputs
 const contractAddress = "0x503a3039e9ce236e9a12E4008AECBB1FD8B384A3";
-const artistName = "Josie Bellini";
+const artistName = "Reuben Wu";
 const searchProperty = "Artist";
 
 let pageIndex = "";
@@ -39,7 +39,7 @@ function appendToList(contractCall) {
                     artist = attribute.value;
                 }
             });
-            if (artist.includes("Josie Bellini")) {
+            if (artist.includes(artistName)) {
                 console.log(nftTitle)
                 if (Array.isArray(artIndex[nftTitle[0]])) {
                     artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
@@ -90,65 +90,93 @@ function detectRange(artName) {
 // Function to add art into notion db
 // Eventually we will want to upload directly to the database and cut out notion
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs, artType) {
-    try {
-        const response = await notion.pages.create({
-            parent: { database_id: databaseId },
-            properties: {
-                title: {
-                    title: [
-                        {
-                            "text": {
-                                "content": title
+    // Look up information on notion to make prevent duplicate
+    const duplicateQuery = await notion.databases.query({
+        database_id: databaseId,
+        filter: {
+            and: [
+                {
+                    property: 'Edition Name',
+                    rich_text:
+                    {
+                        contains: title
+                    }
+                },
+                {
+                    property: 'Contract',
+                    rich_text:
+                    {
+                        contains: address
+                    }
+                },
+            ]
+        }
+    });
+
+    if (duplicateQuery.results.length > 0) {
+        console.log("DUPLICATE FOUND", title, address);
+    }
+    else {
+        try {
+            const response = await notion.pages.create({
+                parent: { database_id: databaseId },
+                properties: {
+                    title: {
+                        title: [
+                            {
+                                "text": {
+                                    "content": title
+                                }
                             }
+                        ]
+                    },
+                    'Contract Type': {
+                        'select': {
+                            'name': tokenType
                         }
-                    ]
+                    },
+                    'Collection': {
+                        'select': {
+                            'name': collection
+                        }
+                    },
+                    Artist: {
+                        relation: [{
+                            id: artistID
+                        }]
+                    },
+                    Contract: {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": address
+                                }
+                            },
+                        ]
+                    },
+                    'Artwork Category': {
+                        'select': {
+                            'name': artType
+                        }
+                    },
+                    'Token ID(s)': {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": tokenIDs
+                                }
+                            },
+                        ]
+                    },
                 },
-                'Contract Type': {
-                    'select': {
-                        'name': tokenType
-                    }
-                },
-                'Collection': {
-                    'select': {
-                        'name': collection
-                    }
-                },
-                Artist: {
-                    relation: [{
-                        id: artistID
-                    }]
-                },
-                Contract: {
-                    "rich_text": [
-                        {
-                            "type": "text",
-                            "text": {
-                                "content": address
-                            }
-                        },
-                    ]
-                },
-                'Artwork Category': {
-                    'select': {
-                        'name': artType
-                    }
-                },
-                'Token ID(s)': {
-                    "rich_text": [
-                        {
-                            "type": "text",
-                            "text": {
-                                "content": tokenIDs
-                            }
-                        },
-                    ]
-                },
-            },
-        })
-        console.log("Success! Entry added.", title)
-    } catch (error) {
-        console.log("Error found when adding", title, "to Notion!");
-        console.error(error.body);
+            })
+            console.log("Success! Entry added.", title)
+        } catch (error) {
+            console.log("Error found when adding", title, "to Notion!");
+            console.error(error.body);
+        }
     }
 }
 
@@ -195,6 +223,7 @@ async function main() {
         const artList = Object.keys(artStorage);
         artList.forEach(artname => {
             const newIDs = detectRange(artname);
+            console.log(`Attempting to add: ${artname}: ${newIDs}`);
             const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
             setTimeout(() => {
                 addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);

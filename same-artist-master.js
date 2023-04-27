@@ -87,6 +87,7 @@ function detectRange(artName, contractAddress) {
 // Function to add art into notion db
 // Eventually we will want to upload directly to the database and cut out notion
 async function addItem(title, tokenType, collection, artistID, address, tokenIDs, artType) {
+    // Look up information on notion to make prevent duplicate
     const duplicateQuery = await notion.databases.query({
         database_id: databaseId,
         filter: {
