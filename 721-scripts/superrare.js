@@ -16,9 +16,12 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // inputs
-const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
-const artistName = "Guido";
-const searchQuery = "Guido Di Salle"
+// First address is superrare which works
+// const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
+// Second address is older superrare which doesn't work
+const contractAddress = "0x41A322b28D0fF354040e2CbC676F0320d8c8850d";
+const artistName = "Sarah Zucker";
+const searchQuery = "Sarah Zucker";
 
 let pageIndex = "";
 let testCount = 0;
@@ -33,9 +36,6 @@ function appendToList(contractCall) {
         let artist = "";
         if (nft.rawMetadata.createdBy) {
             artist = nft.rawMetadata.createdBy
-            if (nft.tokenId === 32597) {
-                console.log(nft);
-            }
             if (artist.includes(searchQuery)) {
                 console.log(nftTitle)
                 if (Array.isArray(artIndex[nftTitle[0]])) {
