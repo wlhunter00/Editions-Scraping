@@ -16,10 +16,9 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // inputs
-const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
-const artistName = "Guido";
-const searchQuery = "Guido Di Salle"
-const searchProperty = "Artist";
+const contractAddress = "0x68d0F6d1d99Bb830E17fFaA8aDB5BbeD9D6EEc2E";
+const artistName = "0xdgb";
+const searchQuery = "Penthouse";
 
 let pageIndex = "";
 let testCount = 0;
@@ -31,24 +30,15 @@ function appendToList(contractCall) {
     contractCall.nfts.forEach(nft => {
         testCount++;
         const nftTitle = nft.title.split(" #");
-        let artist = "";
-        if (nft.rawMetadata.attributes) {
-            // console.log(nft.rawMetadata.attributes)
-            nft.rawMetadata.attributes.forEach(attribute => {
-                if (attribute.trait_type === searchProperty) {
-                    // console.log(attribute.value);
-                    artist = attribute.value;
-                }
-            });
-            if (artist.includes(searchQuery)) {
-                console.log(nftTitle)
-                if (Array.isArray(artIndex[nftTitle[0]])) {
-                    artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
-                }
-                else {
-                    artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
-                    artStorage[nftTitle[0]] = [nft];
-                }
+
+        if (nft.title.includes(searchQuery)) {
+            console.log(nftTitle)
+            if (Array.isArray(artIndex[nftTitle[0]])) {
+                artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
+            }
+            else {
+                artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
+                artStorage[nftTitle[0]] = [nft];
             }
         }
     })
