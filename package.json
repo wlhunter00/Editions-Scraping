@@ -22,6 +22,7 @@
     "@infura/sdk": "^2.3.10",
     "@notionhq/client": "^2.2.3",
     "alchemy-sdk": "^2.5.0",
+    "axios": "^1.4.0",
     "dotenv": "^16.0.3"
   }
 }

@@ -16,10 +16,10 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // inputs
-const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
-const artistName = "Guido";
-const searchQuery = "Guido Di Salle"
-const searchProperty = "Artist";
+const contractAddress = "0x0cd9C257f7565476F5d374ef27854AbDD5916baD";
+const artistName = "Gremplin";
+const searchQuery = "Gremplin"
+const searchProperty = "Creator";
 
 let pageIndex = "";
 let testCount = 0;

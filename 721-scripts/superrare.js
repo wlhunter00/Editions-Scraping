@@ -17,11 +17,11 @@ const alchemy = new Alchemy(settings);
 
 // inputs
 // First address is superrare which works
-// const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
+const contractAddress = "0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0";
 // Second address is older superrare which doesn't work
-const contractAddress = "0x41A322b28D0fF354040e2CbC676F0320d8c8850d";
-const artistName = "Sarah Zucker";
-const searchQuery = "Sarah Zucker";
+// const contractAddress = "0x41A322b28D0fF354040e2CbC676F0320d8c8850d";
+const artistName = "Killer Acid";
+const searchQuery = "Killer Acid";
 
 let pageIndex = "";
 let testCount = 0;
