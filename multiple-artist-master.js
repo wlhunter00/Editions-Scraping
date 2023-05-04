@@ -16,10 +16,10 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // inputs
-const contractAddress = "0x0cd9C257f7565476F5d374ef27854AbDD5916baD";
-const artistName = "Gremplin";
-const searchQuery = "Gremplin"
-const searchProperty = "Creator";
+const contractAddress = "0x33FD426905F149f8376e227d0C9D3340AaD17aF1";
+const artistName = "Alienqueen";
+const searchQuery = "ALIENQUEEN"
+const searchProperty = "Artist";
 
 let pageIndex = "";
 let testCount = 0;
@@ -225,7 +225,7 @@ async function main() {
         artList.forEach(artname => {
             const newIDs = detectRange(artname);
             console.log(`Attempting to add: ${artname}: ${newIDs}`);
-            const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
+            const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0 || artStorage[artname][0].tokenType.slice(3) === "1155") ? "Edition" : "1of1"
             setTimeout(() => {
                 addItem(artname, artStorage[artname][0].tokenType.slice(3), artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
             }, 5000);
