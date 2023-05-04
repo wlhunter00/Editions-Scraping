@@ -19,8 +19,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "Hackatao"
-const contractAddressList = ["0xB791E3190B6b0476fCe119762B87fe2a2CA36F93"];
+const artistName = "Mad Dog Jones"
+const contractAddressList = ["0xAe1fB0ccE66904b9fa2b60BeF2B8057CE2441538"];
 
 // Setup inital variables for tracking
 let contractStorage = {};
@@ -32,10 +32,10 @@ function appendToList(contractCall, contractAddress) {
     contractCall.nfts.forEach(nft => {
         const nftTitle = nft.title.split(" #");
         if (Array.isArray(contractStorage[contractAddress].artIndex[nftTitle[0]])) {
-            contractStorage[contractAddress].artIndex[nftTitle[0]].push(parseInt(nft.tokenId))
+            contractStorage[contractAddress].artIndex[nftTitle[0]].push(nft.tokenId)
         }
         else {
-            contractStorage[contractAddress].artIndex[nftTitle[0]] = [parseInt(nft.tokenId)];
+            contractStorage[contractAddress].artIndex[nftTitle[0]] = [nft.tokenId];
             contractStorage[contractAddress].artStorage[nftTitle[0]] = [nft];
             // If there is another # in the title of the NFT (other than identifying the edition number) - we need to throw an error
             if (nftTitle.length == 3) {
