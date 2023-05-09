@@ -9,17 +9,18 @@ const databaseId = process.env.DATABASE_ID;
 const artistDatabaseId = process.env.ARTIST_DB_ID;
 
 // Set scraping variables
-const artistName = "Killer Acid"
-const searchQuery = "killeracid"
+const artistName = "DeeKay"
+const searchQuery = "deekay"
 
 // Setting web crawling variables
 let page = 1;
 const perPage = 200;
 
 
-async function getNFTs() {
+async function get1of1s() {
     console.log("API called. Page #", page);
     const requestURL = `https://alpha.illiquid.xyz/api/trpc/token.seriesByArtist?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22artistId%22%3A%22${searchQuery}%22%2C%22page%22%3A${page}%2C%22perPage%22%3A${perPage}%2C%22sortBy%22%3A%22floor%22%2C%22sortDirection%22%3A%22asc%22%7D%7D%7D`
+    console.log(requestURL)
     try {
         const response = await axios.get(requestURL);
         return response.data[0].result.data.json;
@@ -29,13 +30,13 @@ async function getNFTs() {
     }
 }
 
-async function scrapeAllNFTs() {
+async function scrapeAll1of1s() {
     let NFTList = [];
-    let returnedNFTs = await getNFTs();
+    let returnedNFTs = await get1of1s();
     while (returnedNFTs.length > 0) {
         NFTList = NFTList.concat(returnedNFTs);
         page += 1;
-        returnedNFTs = await getNFTs();
+        returnedNFTs = await get1of1s();
     }
     return NFTList;
 }
@@ -129,17 +130,11 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
         } catch (error) {
             console.log("Error found when adding", title, "to Notion!");
             console.error(error.body);
-            // Pushes error object if there is an issue 
-            errorTokens.push({
-                title: title,
-                contractAddress: address,
-                tokenId: tokenIDs
-            });
         }
     }
 }
 
-async function main() {
+async function find1of1s() {
     const artistIDQuery = await notion.databases.query({
         database_id: artistDatabaseId,
         filter: {
@@ -160,15 +155,16 @@ async function main() {
         const artistNotionID = artistIDQuery.results[0].id;
         console.log(`Scraping NFTs for ${artistName} (${artistNotionID}).`);
 
-        const nfts = await scrapeAllNFTs();
+        const nfts = await scrapeAll1of1s();
         nfts.forEach(nft => {
-            if (nft.metadata.chain === 'ethereum') {
+            if (nft.metadata.chain === 'ethereum' && nft.metadata.name != null) {
                 console.log("Attemping to add", nft.metadata.name);
                 const artType = nft.metadata.supply.total > 1 ? "Edition" : "1of1";
-                addItem(nft.metadata.name, "721", nft.set.name, artistNotionID, nft.contractAddress, nft.tokenId, artType);
+                const collection = nft.set.name || "";
+                addItem(nft.metadata.name, "721", collection, artistNotionID, nft.contractAddress, nft.tokenId, artType);
             }
         });
     }
 }
 
-main();
+find1of1s();
