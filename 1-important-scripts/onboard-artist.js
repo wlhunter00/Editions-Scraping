@@ -230,7 +230,6 @@ async function handleScraping(artistNotionID, contractAddress) {
     };
 
     console.log("fetching NFTs for contract address:", contractAddress);
-    console.log("...");
 
     // Query first NFT page from alchemy
     const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
@@ -240,7 +239,6 @@ async function handleScraping(artistNotionID, contractAddress) {
             appendToList(nftsForContract, contractAddress);
             while (contractStorage[contractAddress].pageIndex != undefined) {
                 console.log("making api call", contractStorage[contractAddress].pageIndex);
-                console.log("...");
                 const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
                     pageKey: contractStorage[contractAddress].pageIndex
                 });
@@ -277,7 +275,6 @@ async function handleScraping(artistNotionID, contractAddress) {
             // Loop through all pages
             while (contractStorage[contractAddress].pageIndex != undefined) {
                 console.log("making api call", contractStorage[contractAddress].pageIndex);
-                console.log("...");
 
                 const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
                     pageKey: contractStorage[contractAddress].pageIndex
@@ -360,6 +357,104 @@ async function scrapeIlliquid1of1s(artistNotionID) {
     console.log("Illiquid 1of1s Scraped!");
 }
 
+// Get specific illiquid editions
+async function getEditionMetadata(editionID, editionPage) {
+    const requestURL = `https://alpha.illiquid.xyz/api/trpc/token.bySet?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22artistId%22%3A%22${illiquidSearchQuery}%22%2C%22page%22%3A${editionPage}%2C%22setId%22%3A${editionID}%2C%22perPage%22%3A${perPage}%2C%22sortBy%22%3A%22floor%22%2C%22sortDirection%22%3A%22asc%22%7D%7D%7D`
+    try {
+        const response = await axios.get(requestURL);
+        // console.log(response.data[0].result.data.json);
+        return response.data[0].result.data.json;
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
+}
+
+// Helper function to get metadata of illiquid editions
+async function scrapeIlliquidEditionsMetadata(edition) {
+    const NFTList = [];
+    let editionPage = 1;
+    console.log(`Set API called for ${edition.set.title} - Page #${editionPage}`);
+    let returnedNFTs = await getEditionMetadata(edition.set.id, editionPage);
+    while (returnedNFTs.length > 0) {
+        NFTList.push(...returnedNFTs);
+        editionPage += 1;
+        console.log(`Set API called for ${edition.set.title} - Page #${editionPage}`);
+        returnedNFTs = await getEditionMetadata(edition.set.id, editionPage);
+    }
+    return NFTList;
+}
+
+// Modified verison of appendtoList specifically for illiquid
+function storeEditionMetadata(contractCall) {
+    contractCall.forEach(nft => {
+        if (nft.metadata.chain === 'ethereum' && nft.metadata.name != null) {
+            const nftTitle = nft.metadata.name.split(" #");
+            if (Array.isArray(illiquidIndex[nftTitle[0]])) {
+                illiquidIndex[nftTitle[0]].push(nft.tokenId)
+            }
+            else {
+                illiquidIndex[nftTitle[0]] = [nft.tokenId];
+                illiquidStorage[nftTitle[0]] = nft;
+                // If there is another # in the title of the NFT (other than identifying the edition number) - we need to throw an error
+                if (nftTitle.length == 3) {
+                    console.log("# found in NFT title!", nft.title)
+                }
+            }
+        }
+    });
+}
+
+// Takes in an array of ints, and detects ranges where the numbers are continous. Needed for 721s.
+function detectRangeIlliquid(artName) {
+    let idArray = illiquidIndex[artName];
+    let megaString = "";
+    let endPoint = -1;
+    idArray.sort(function (a, b) { return a - b });
+
+    while (endPoint != idArray.length - 1) {
+        const newBegin = endPoint + 2;
+        endPoint = returnLastElement(idArray, newBegin, idArray.length);
+        if (idArray[endPoint] === idArray[newBegin - 1]) {
+            megaString = `${megaString}, ${idArray[endPoint]}`;
+        }
+        else {
+            megaString = `${megaString}, ${idArray[newBegin - 1]}-${idArray[endPoint]}`;
+        }
+    }
+    megaString = megaString.slice(2);
+    return megaString
+}
+
+// Core function to hit Illiquid's API to find missing edition artwork
+async function scrapeIlliquidEditions(artistNotionID) {
+    // Get edition sets
+    const getIlliquidSetsReq = `https://alpha.illiquid.xyz/_next/data/fO9jsMcCRz9MWZb1OW8K7/creator/${illiquidSearchQuery}.json`;
+    const illiquidSets = await axios.get(getIlliquidSetsReq);
+    const editionList = illiquidSets.data.pageProps.setStats;
+
+    await Promise.all(
+        editionList.map(async (edition) => {
+            const editionOutput = await scrapeIlliquidEditionsMetadata(edition);
+            storeEditionMetadata(editionOutput);
+        })
+    );
+
+    const artList = Object.keys(illiquidStorage);
+
+    await Promise.all(
+        artList.map(async (artname) => {
+            const newIDs = detectRangeIlliquid(artname);
+            const tokenType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "721" : "1155";
+            const collection = illiquidStorage[artname].set ? illiquidStorage[artname].set.name : "";
+            console.log(`Attempting to add: ${artname}: ${newIDs} (ERC-${tokenType})`);
+            const notionResponse = await addItem(artname, tokenType, collection, artistNotionID, illiquidStorage[artname].contractAddress, newIDs, "Edition");
+        })
+    );
+
+    console.log("Illiquid Editions Scraped!");
+}
+
 async function main() {
     // Query the artists notion id from the database
     const artistIDQuery = await notion.databases.query({
@@ -389,9 +484,10 @@ async function main() {
         // Step 2 - scrape 1 of 1 artworks from illiquid
         await scrapeIlliquid1of1s(artistNotionID);
         console.log("...");
-        // // Step 3 - scrape editions from illiquid (it's the most unreliable so we want to do this last)
-        // scrapeIlliquidEditions(artistNotionID);
-        // console.log("Artist onboarding finished");
+
+        // Step 3 - scrape editions from illiquid (it's the most unreliable so we want to do this last)
+        await scrapeIlliquidEditions(artistNotionID);
+        console.log("Artist onboarding finished");
     }
     else {
         console.log("Artist not in Notion!");
