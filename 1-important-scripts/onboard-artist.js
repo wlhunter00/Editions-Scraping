@@ -3,7 +3,7 @@ import { Network, Alchemy } from "alchemy-sdk";
 import * as dotenv from 'dotenv';
 dotenv.config();
 import { Client } from "@notionhq/client"
-import * as fs from 'fs';
+import axios from 'axios';
 
 // Setup notion api
 const notion = new Client({ auth: process.env.NOTION_SECRET })
@@ -19,7 +19,17 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "x0r"
+const artistName = "DeeKay"
+const illiquidSearchQuery = "deekay"
+
+
+// Setup inital variables for tracking
+let contractStorage = {};
+let countContracts = 0;
+let page1of1 = 1;
+const perPage = 200;
+let illiquidIndex = {};
+let illiquidStorage = {};
 
 // Define the asynchronous function that will retrieve deployed contracts
 async function findContractsDeployed(address) {
@@ -63,10 +73,6 @@ async function findContractsDeployed(address) {
     const contractAddresses = receipts.map((receipt) => receipt?.contractAddress);
     return contractAddresses;
 }
-
-// Setup inital variables for tracking
-let contractStorage = {};
-let countContracts = 0;
 
 // Takes in a contract call for a 721 contract, and will identify editions
 function appendToList(contractCall, contractAddress) {
@@ -295,6 +301,65 @@ async function handleScraping(artistNotionID, contractAddress) {
     countContracts++;
 }
 
+// Find all contract deploys by the artist and run the address through handleScraping
+async function scrapeDeploys(artistNotionID, artistAddress) {
+    const contractAddresses = await findContractsDeployed(artistAddress);
+
+    // Log the contract addresses in a readable format by looping through the array
+    console.log(`Scraping NFTs for ${artistName} (${artistNotionID}).`);
+    console.log(`The following contracts were deployed by ${artistAddress}:`);
+    for (let i = 0; i < contractAddresses.length; i++) {
+        console.log(`${i + 1}. ${contractAddresses[i]}`);
+    }
+    console.log("...");
+
+    // Run the scrape for each contract deployed
+    await Promise.all(
+        contractAddresses.map(async (contractAddress) => {
+            await handleScraping(artistNotionID, contractAddress);
+        })
+    );
+    console.log("Artist Deploys Scraped!");
+}
+
+// Helper function for scrapeIlliquid1of1s
+async function get1of1s() {
+    console.log("1of1 API called. Page #", page1of1);
+    const requestURL = `https://alpha.illiquid.xyz/api/trpc/token.seriesByArtist?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22artistId%22%3A%22${illiquidSearchQuery}%22%2C%22page%22%3A${page1of1}%2C%22perPage%22%3A${perPage}%2C%22sortBy%22%3A%22floor%22%2C%22sortDirection%22%3A%22asc%22%7D%7D%7D`
+    console.log(requestURL)
+    try {
+        const response = await axios.get(requestURL);
+        return response.data[0].result.data.json;
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
+}
+
+// Core function to hit Illiquid's API and find all the 1 of 1 artwork
+async function scrapeIlliquid1of1s(artistNotionID) {
+    const NFTList = [];
+    let returnedNFTs = await get1of1s();
+
+    while (returnedNFTs.length > 0) {
+        NFTList.push(...returnedNFTs);
+        page1of1 += 1;
+        returnedNFTs = await get1of1s();
+    }
+
+    await Promise.all(
+        NFTList.map(async (nft) => {
+            if (nft.metadata.chain === 'ethereum' && nft.metadata.name != null) {
+                console.log("Attemping to add", nft.metadata.name);
+                const artType = nft.metadata.supply.total > 1 ? "Edition" : "1of1";
+                const collection = nft.set.name || "";
+                const notionResponse = await addItem(nft.metadata.name, "721", collection, artistNotionID, nft.contractAddress, nft.tokenId, artType);
+            }
+        })
+    );
+    console.log("Illiquid 1of1s Scraped!");
+}
+
 async function main() {
     // Query the artists notion id from the database
     const artistIDQuery = await notion.databases.query({
@@ -314,26 +379,19 @@ async function main() {
 
     // Only scrape if the artist exists
     if (artistIDQuery.results[0]) {
-        const artistAddress = artistIDQuery.results[0].properties['Sign-In Address(es)'].rich_text[0].plain_text;
         const artistNotionID = artistIDQuery.results[0].id;
-        const contractAddresses = await findContractsDeployed(artistAddress);
+        const artistAddress = artistIDQuery.results[0].properties['Sign-In Address(es)'].rich_text[0].plain_text;
 
-        // Log the contract addresses in a readable format by looping through the array
-        console.log(`Scraping NFTs for ${artistName} (${artistNotionID}).`);
-        console.log(`The following contracts were deployed by ${artistAddress}:`);
-        for (let i = 0; i < contractAddresses.length; i++) {
-            console.log(`${i + 1}. ${contractAddresses[i]}`);
-        }
+        // Step 1 - scrape deploys
+        await scrapeDeploys(artistNotionID, artistAddress);
         console.log("...");
 
-        // Run the scrape for each contract deployed
-        await Promise.all(
-            contractAddresses.map(async (contractAddress) => {
-                await handleScraping(artistNotionID, contractAddress);
-            })
-        );
-        console.log("Artist Scraped!")
-
+        // Step 2 - scrape 1 of 1 artworks from illiquid
+        await scrapeIlliquid1of1s(artistNotionID);
+        console.log("...");
+        // // Step 3 - scrape editions from illiquid (it's the most unreliable so we want to do this last)
+        // scrapeIlliquidEditions(artistNotionID);
+        // console.log("Artist onboarding finished");
     }
     else {
         console.log("Artist not in Notion!");
