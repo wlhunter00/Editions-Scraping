@@ -19,8 +19,11 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "DeeKay"
-const illiquidSearchQuery = "deekay"
+const artistName = "FVCKRENDER";
+const illiquidSearchQuery = "FVCKRENDER";
+const alchemyScrape = true;
+const illiquidScrape1of1 = false;
+const illiquidScrapeEdition = false;
 
 
 // Setup inital variables for tracking
@@ -176,7 +179,7 @@ async function addItem(title, tokenType, collection, artistID, address, tokenIDs
                     },
                     'Collection': {
                         'select': {
-                            'name': collection
+                            'name': collection != undefined ? collection : "N/A"
                         }
                     },
                     Artist: {
@@ -254,7 +257,6 @@ async function handleScraping(artistNotionID, contractAddress) {
                 artList.map(async (artname) => {
                     const newIDs = detectRange(artname, contractAddress);
                     const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
-
                     console.log(`Attempting to add: ${artname}: ${newIDs}`);
                     const notionConfirmation = await addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
                 })
@@ -477,16 +479,21 @@ async function main() {
         const artistNotionID = artistIDQuery.results[0].id;
         const artistAddress = artistIDQuery.results[0].properties['Sign-In Address(es)'].rich_text[0].plain_text;
 
-        // Step 1 - scrape deploys
-        await scrapeDeploys(artistNotionID, artistAddress);
-        console.log("...");
+        if (alchemyScrape) {
+            // Step 1 - scrape deploys
+            await scrapeDeploys(artistNotionID, artistAddress);
+            console.log("...");
+        }
 
-        // Step 2 - scrape 1 of 1 artworks from illiquid
-        await scrapeIlliquid1of1s(artistNotionID);
-        console.log("...");
-
-        // Step 3 - scrape editions from illiquid (it's the most unreliable so we want to do this last)
-        await scrapeIlliquidEditions(artistNotionID);
+        if (illiquidScrape1of1) {
+            // Step 2 - scrape 1 of 1 artworks from illiquid
+            await scrapeIlliquid1of1s(artistNotionID);
+            console.log("...");
+        }
+        if (illiquidScrapeEdition) {
+            // Step 3 - scrape editions from illiquid (it's the most unreliable so we want to do this last)
+            await scrapeIlliquidEditions(artistNotionID);
+        }
         console.log("Artist onboarding finished");
     }
     else {
