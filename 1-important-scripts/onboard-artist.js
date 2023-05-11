@@ -1,16 +1,25 @@
-// Import the necessary modules from the Alchemy SDK
+// Imports
 import { Network, Alchemy } from "alchemy-sdk";
+import * as dotenv from 'dotenv';
+dotenv.config();
+import { Client } from "@notionhq/client"
+import * as fs from 'fs';
 
-// Optional Config object, but defaults to demo api-key and eth-mainnet.
+// Setup notion api
+const notion = new Client({ auth: process.env.NOTION_SECRET })
+const databaseId = process.env.DATABASE_ID;
+const artistDatabaseId = process.env.ARTIST_DB_ID;
+
+// Setup alchemy api
 const settings = {
     apiKey: process.env.ALCHEMY, // Replace with your Alchemy API Key.
     network: Network.ETH_MAINNET, // Replace with your network.
+
 };
 const alchemy = new Alchemy(settings);
 
-// Replace with the address you want to query the deployed contracts for - can be ENS name or address hash
-const address = "x0r.eth";
-
+// IMPORTANT: Configure inputs - artist name and an array of contract addresses
+const artistName = "x0r"
 
 // Define the asynchronous function that will retrieve deployed contracts
 async function findContractsDeployed(address) {
@@ -55,17 +64,281 @@ async function findContractsDeployed(address) {
     return contractAddresses;
 }
 
-// Define the main function that will execute the script
-async function main() {
-    // Call the findContractsDeployed function to retrieve the array of deployed contracts
-    const contractAddresses = await findContractsDeployed(address);
+// Setup inital variables for tracking
+let contractStorage = {};
+let countContracts = 0;
 
-    // Log the contract addresses in a readable format by looping through the array
-    console.log(`The following contracts were deployed by ${address}:`);
-    for (let i = 0; i < contractAddresses.length; i++) {
-        console.log(`${i + 1}. ${contractAddresses[i]}`);
+// Takes in a contract call for a 721 contract, and will identify editions
+function appendToList(contractCall, contractAddress) {
+    contractCall.nfts.forEach(nft => {
+        const nftTitle = nft.title.split(" #");
+        if (Array.isArray(contractStorage[contractAddress].artIndex[nftTitle[0]])) {
+            contractStorage[contractAddress].artIndex[nftTitle[0]].push(nft.tokenId)
+        }
+        else {
+            contractStorage[contractAddress].artIndex[nftTitle[0]] = [nft.tokenId];
+            contractStorage[contractAddress].artStorage[nftTitle[0]] = [nft];
+            // If there is another # in the title of the NFT (other than identifying the edition number) - we need to throw an error
+            if (nftTitle.length == 3) {
+                console.log("# found in NFT title!", nft.title)
+            }
+        }
+        contractStorage[contractAddress].testCount++;
+    });
+    contractStorage[contractAddress].pageIndex = contractCall.pageKey;
+}
+
+// Helper function for detectRange
+function returnLastElement(arr, j, n) {
+    arr.sort(function (a, b) { return a - b });
+
+    for (let i = j; i < n; i++)
+        if (arr[i] - arr[i - 1] != 1)
+            return i - 1;
+
+    return n - 1;
+}
+
+// Takes in an array of ints, and detects ranges where the numbers are continous. Needed for 721s.
+function detectRange(artName, contractAddress) {
+    let idArray = contractStorage[contractAddress].artIndex[artName];
+    let megaString = "";
+    let endPoint = -1;
+    idArray.sort(function (a, b) { return a - b });
+
+    while (endPoint != idArray.length - 1) {
+        const newBegin = endPoint + 2;
+        endPoint = returnLastElement(idArray, newBegin, idArray.length);
+        if (idArray[endPoint] === idArray[newBegin - 1]) {
+            megaString = `${megaString}, ${idArray[endPoint]}`;
+        }
+        else {
+            megaString = `${megaString}, ${idArray[newBegin - 1]}-${idArray[endPoint]}`;
+        }
+    }
+    megaString = megaString.slice(2);
+    return megaString
+}
+
+// Function to add art into notion db
+// Eventually we will want to upload directly to the database and cut out notion
+async function addItem(title, tokenType, collection, artistID, address, tokenIDs, artType) {
+    // Look up information on notion to make prevent duplicate
+    const duplicateQuery = await notion.databases.query({
+        database_id: databaseId,
+        filter: {
+            and: [
+                {
+                    property: 'Edition Name',
+                    rich_text:
+                    {
+                        contains: title
+                    }
+                },
+                {
+                    property: 'Contract',
+                    rich_text:
+                    {
+                        contains: address
+                    }
+                },
+            ]
+        }
+    });
+
+    if (duplicateQuery.results.length > 0) {
+        console.log("DUPLICATE FOUND", title, address);
+    }
+    else {
+        try {
+            const response = await notion.pages.create({
+                parent: { database_id: databaseId },
+                properties: {
+                    title: {
+                        title: [
+                            {
+                                "text": {
+                                    "content": title
+                                }
+                            }
+                        ]
+                    },
+                    'Contract Type': {
+                        'select': {
+                            'name': tokenType
+                        }
+                    },
+                    'Collection': {
+                        'select': {
+                            'name': collection
+                        }
+                    },
+                    Artist: {
+                        relation: [{
+                            id: artistID
+                        }]
+                    },
+                    Contract: {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": address
+                                }
+                            },
+                        ]
+                    },
+                    'Artwork Category': {
+                        'select': {
+                            'name': artType
+                        }
+                    },
+                    'Token ID(s)': {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": tokenIDs
+                                }
+                            },
+                        ]
+                    },
+                },
+            })
+            console.log("Success! Entry added.", title)
+        } catch (error) {
+            console.log("Error found when adding", title, "to Notion!");
+            console.error(error.body);
+        }
     }
 }
 
-// Call the main function to start the script
+// Core function. Takes in the artist and the contract address
+async function handleScraping(artistNotionID, contractAddress) {
+    // contract storage stores key variables for each contract
+    contractStorage[contractAddress] = {
+        pageIndex: "",
+        testCount: 0,
+        artIndex: {},
+        artStorage: {}
+    };
+
+    console.log("fetching NFTs for contract address:", contractAddress);
+    console.log("...");
+
+    // Query first NFT page from alchemy
+    const nftsForContract = await alchemy.nft.getNftsForContract(contractAddress);
+    if (nftsForContract.nfts.length > 0) {
+        if (nftsForContract.nfts[0].tokenType.includes("721")) {
+            // handle the first page of NFTs
+            appendToList(nftsForContract, contractAddress);
+            while (contractStorage[contractAddress].pageIndex != undefined) {
+                console.log("making api call", contractStorage[contractAddress].pageIndex);
+                console.log("...");
+                const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
+                    pageKey: contractStorage[contractAddress].pageIndex
+                });
+                appendToList(newContractCall, contractAddress);
+            }
+            console.log("# ID's parsed from", contractAddress, "-", contractStorage[contractAddress].testCount);
+
+            // After all the Alchemy pages have been scraped, loop through each edition
+            const artList = Object.keys(contractStorage[contractAddress].artStorage);
+
+            // Request to add each artwork to notion
+            await Promise.all(
+                artList.map(async (artname) => {
+                    const newIDs = detectRange(artname, contractAddress);
+                    const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
+
+                    console.log(`Attempting to add: ${artname}: ${newIDs}`);
+                    const notionConfirmation = await addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
+                })
+            );
+
+            console.log("...");
+        }
+        else if (nftsForContract.nfts[0].tokenType.includes("1155")) {
+            // For 1155s all we need to do is store the edition
+            await Promise.all(
+                nftsForContract.nfts.map(async (nft) => {
+                    console.log("adding", nft.title);
+                    const notionConfirmation = await addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
+                })
+            );
+
+            contractStorage[contractAddress].pageIndex = nftsForContract.pageKey;
+            // Loop through all pages
+            while (contractStorage[contractAddress].pageIndex != undefined) {
+                console.log("making api call", contractStorage[contractAddress].pageIndex);
+                console.log("...");
+
+                const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
+                    pageKey: contractStorage[contractAddress].pageIndex
+                });
+
+                await Promise.all(
+                    newContractCall.nfts.map(async (nft) => {
+                        console.log("adding", nft.title);
+                        const notionConfirmation = await addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
+                    })
+                );
+
+                contractStorage[contractAddress].pageIndex = newContractCall.pageKey;
+            }
+            console.log("...");
+        }
+    }
+    else {
+        console.log(`Contract ${contractAddress} isn't an NFT contract.`);
+    }
+    countContracts++;
+}
+
+async function main() {
+    // Query the artists notion id from the database
+    const artistIDQuery = await notion.databases.query({
+        database_id: artistDatabaseId,
+        filter: {
+            and: [
+                {
+                    property: 'Name',
+                    rich_text:
+                    {
+                        contains: artistName
+                    }
+                }
+            ]
+        }
+    });
+
+    // Only scrape if the artist exists
+    if (artistIDQuery.results[0]) {
+        const artistAddress = artistIDQuery.results[0].properties['Sign-In Address(es)'].rich_text[0].plain_text;
+        const artistNotionID = artistIDQuery.results[0].id;
+        const contractAddresses = await findContractsDeployed(artistAddress);
+
+        // Log the contract addresses in a readable format by looping through the array
+        console.log(`Scraping NFTs for ${artistName} (${artistNotionID}).`);
+        console.log(`The following contracts were deployed by ${artistAddress}:`);
+        for (let i = 0; i < contractAddresses.length; i++) {
+            console.log(`${i + 1}. ${contractAddresses[i]}`);
+        }
+        console.log("...");
+
+        // Run the scrape for each contract deployed
+        await Promise.all(
+            contractAddresses.map(async (contractAddress) => {
+                await handleScraping(artistNotionID, contractAddress);
+            })
+        );
+        console.log("Artist Scraped!")
+
+    }
+    else {
+        console.log("Artist not in Notion!");
+    }
+}
+
 main();
+

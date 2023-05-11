@@ -231,11 +231,12 @@ async function handleScraping(artistNotionID, contractAddress) {
     else if (nftsForContract.nfts[0].tokenType.includes("1155")) {
         // For 1155s all we need to do is store the edition
         await Promise.all(
-            artList.map(async (nft) => {
+            nftsForContract.nfts.map(async (nft) => {
                 console.log("adding", nft.title);
                 const notionConfirmation = await addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
             })
         );
+
         contractStorage[contractAddress].pageIndex = nftsForContract.pageKey;
         // Loop through all pages
         while (contractStorage[contractAddress].pageIndex != undefined) {
@@ -245,10 +246,14 @@ async function handleScraping(artistNotionID, contractAddress) {
             const newContractCall = await alchemy.nft.getNftsForContract(contractAddress, {
                 pageKey: contractStorage[contractAddress].pageIndex
             });
-            newContractCall.nfts.forEach(nft => {
-                console.log("adding", nft.title);
-                addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
-            });
+
+            await Promise.all(
+                newContractCall.nfts.map(async (nft) => {
+                    console.log("adding", nft.title);
+                    const notionConfirmation = await addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
+                })
+            );
+
             contractStorage[contractAddress].pageIndex = newContractCall.pageKey;
         }
         console.log("...");
