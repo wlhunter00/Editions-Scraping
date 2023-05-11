@@ -19,8 +19,8 @@ const settings = {
 const alchemy = new Alchemy(settings);
 
 // IMPORTANT: Configure inputs - artist name and an array of contract addresses
-const artistName = "Mad Dog Jones"
-const contractAddressList = ["0xAe1fB0ccE66904b9fa2b60BeF2B8057CE2441538"];
+const artistName = "x0r"
+const contractAddressList = ["0x8a9D536f8818862EbC5E38E0ab0754ec72584c04"];
 
 // Setup inital variables for tracking
 let contractStorage = {};
@@ -214,21 +214,28 @@ async function handleScraping(artistNotionID, contractAddress) {
 
         // After all the Alchemy pages have been scraped, loop through each edition
         const artList = Object.keys(contractStorage[contractAddress].artStorage);
-        artList.forEach(artname => {
-            // Take the array of ints for IDs and instead get a string with ranges
-            const newIDs = detectRange(artname, contractAddress);
-            console.log(`Attempting to add: ${artname}: ${newIDs}`);
-            const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
-            addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
-        });
+
+        // Request to add each artwork to notion
+        await Promise.all(
+            artList.map(async (artname) => {
+                const newIDs = detectRange(artname, contractAddress);
+                const artType = (newIDs.split(",").length - 1 > 0 || newIDs.split("-").length - 1 > 0) ? "Edition" : "1of1"
+
+                console.log(`Attempting to add: ${artname}: ${newIDs}`);
+                const notionConfirmation = await addItem(artname, contractStorage[contractAddress].artStorage[artname][0].tokenType.slice(3), contractStorage[contractAddress].artStorage[artname][0].contract.openSea.collectionName, artistNotionID, contractAddress, newIDs, artType);
+            })
+        );
+
         console.log("...");
     }
     else if (nftsForContract.nfts[0].tokenType.includes("1155")) {
         // For 1155s all we need to do is store the edition
-        nftsForContract.nfts.forEach(nft => {
-            console.log("adding", nft.title);
-            addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
-        });
+        await Promise.all(
+            artList.map(async (nft) => {
+                console.log("adding", nft.title);
+                const notionConfirmation = await addItem(nft.title, nft.tokenType.slice(3), nft.contract.openSea.collectionName, artistNotionID, contractAddress, nft.tokenId, "Edition");
+            })
+        );
         contractStorage[contractAddress].pageIndex = nftsForContract.pageKey;
         // Loop through all pages
         while (contractStorage[contractAddress].pageIndex != undefined) {
